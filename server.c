@@ -1,6 +1,9 @@
 #include <stdio.h> 
 #include <sys/ipc.h> 
 #include <sys/msg.h> 
+#include <stdlib.h>
+#include <string.h>
+
 #define KEY  999
 
 struct employee{
@@ -16,43 +19,73 @@ struct Node{
 	struct Node* next;
 };
 enum optype  {add =1, update,delete};
-struct Node* Head = NULL;
+struct Node* head = NULL;
 
 
-struct req_buffer { 
+struct req_buf { 
 	long mesg_id; 
 	enum optype operation;
 	struct employee data; 
-} request; 
-void addNode(struct employee data){
-	struct Node node;
-	node.data = data;
-	node.next = NULL;
-	if(Head == NULL){
-		Head =  &node ;
-		printf("at %p\n",Head);
-	}
-	else{
-		struct Node* t = Head;
-		while(t->next != NULL){
-			t = t->next;
-		}
-		t->next = &node;
-		printf("at %p\n",&node);
-	}
+} request;
+
+void add_node(struct Node *node){
+        if(head==NULL){
+                head=node;
+                return;
+        }
+        struct Node *current=head;
+        while(current->next!=NULL){
+                current=current->next;
+        }
+        current->next=node;
+} 
+
+void create_node(struct req_buf *request){
+        struct Node *node=(struct Node *)malloc(sizeof(struct Node));
+
+        strcpy(node->data.firstname,request->data.firstname);
+        strcpy(node->data.lastname,request->data.lastname);
+        strcpy(node->data.contact,request->data.contact);
+        strcpy(node->data.project,request->data.project);
+        node->data.emp_id=request->data.emp_id;
+        node->data.exp=request->data.exp;
+        node->next=NULL;
+        add_node(node);
+
+
 }
 
 void traverse(){
-	if(Head == NULL){
-		printf("EMPTY LIST");
+	struct Node *current=head;
+	if(head==NULL){
+		printf("no elements\n");
+		return;
 	}
-	else{
-		struct Node* t = Head;
-		while(t != NULL){
-			printf("Node : %s\n",t->data.firstname);
-			t = t->next;
+	while(current!=NULL){
+		printf("Node : %s\n",current->data.firstname);
+		current=current->next;
+	}
+	
+}
+void delete_node(struct req_buf *request){
+	if(head==NULL){
+		printf("list is empty\n");
+		return;
+	}
+	struct Node *current=head;
+	struct Node *prev=NULL;
+	while(current!=NULL){
+		if(current->data.emp_id==request->data.emp_id){
+			if(prev==NULL){
+				head=current->next;
+			}
+			else{
+				prev->next=current->next;
+			}
+			free(current);
 		}
-		
+		prev=current;
+		current=current->next;
 	}
 }
 int main() 
@@ -66,11 +99,13 @@ int main()
 		printf("Data Received is : %s \n",request.data.firstname); 
 		printf("Data Received is : %d \n",request.operation); 
 		if(request.operation == add){
-		printf("adding node ");
-		addNode(request.data);
-		traverse();
-		
-	}
+			printf("adding node ");
+			//addNode(request.data);
+			create_node(&request);
+			traverse();
+		}else if(request.operation == delete){
+			
+		}
 	}
 	}
 	// to destroy the message queue 
