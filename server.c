@@ -28,6 +28,16 @@ struct req_buf {
 	struct employee data; 
 } request;
 
+void write_to_file(){
+        FILE *file=fopen("data.txt","w");
+        struct Node *node=head;
+        while(node!=NULL){
+               fprintf(file,"%s,%s,%d,%s,%lf,%s\n",node->data.firstname,node->data.lastname,node->data.emp_id,node->data.contact,node->data.exp,node->data.project);
+               node=node->next;
+        }
+        fclose(file);
+}
+
 void add_node(struct Node *node){
         if(head==NULL){
                 head=node;
@@ -54,7 +64,43 @@ void create_node(struct req_buf *request){
 
 
 }
+void read_from_file(){
+        FILE *file=fopen("data.txt","r");
+        if(file==NULL){
+                printf("error in reading file\n");
+                return;
+        }
+        struct employee data;
+	char line[100]; 
 
+        while(fgets(line, sizeof(line), file) != NULL){
+		if (sscanf(line,"%[^,],%[^,],%d,%[^,],%f,%[^\n]", data.firstname, data.lastname, &data.emp_id, data.contact,  &data.exp, data.project) == 7) {
+			printf("Reading data from file: %s %s %d %s %lf %s\n", data.firstname, data.lastname, data.emp_id, data.contact, data.exp, data.project);
+
+                         struct Node *node=(struct Node*)malloc(sizeof(struct Node));
+                         if(node==NULL){
+				 printf("memory allocation error\n");
+                                 fclose(file);
+                                 return;
+                         }
+                         strcpy(node->data.firstname,data.firstname);
+                         strcpy(node->data.lastname,data.lastname);
+                         strcpy(node->data.contact,data.contact);
+                         strcpy(node->data.project,data.project);
+                         node->data.emp_id=data.emp_id;
+                         node->data.exp=data.exp;
+                         node->next=NULL;
+                         struct req_buf read_req;
+                         read_req.data = data;
+                         create_node(&read_req);
+           } 
+	         else {
+                         printf("Error parsing line: %s\n", line);
+            }
+    }
+
+    fclose(file);
+}
 void traverse(){
 	struct Node *current=head;
 	if(head==NULL){
@@ -88,6 +134,7 @@ void delete_node(struct req_buf *request){
 		current=current->next;
 	}
 }
+
 int main() 
 { 
 	key_t key = KEY; 
