@@ -3,6 +3,7 @@
 #include <sys/msg.h> 
 #include <stdlib.h>
 #include <string.h>
+#include<pthread.h>
 
 #define KEY  999
 
@@ -18,9 +19,9 @@ struct Node{
 	struct employee data;
 	struct Node* next;
 };
-enum optype  {add =1, update,delete};
+enum optype  {add = 1, delete,list};
 struct Node* head = NULL;
-
+pthread_mutex_t mutex;
 
 struct req_buf { 
 	long mesg_id; 
@@ -28,7 +29,7 @@ struct req_buf {
 	struct employee data; 
 } request;
 
-void write_to_file(){
+void WriteDB(){
         FILE *file=fopen("data.txt","w");
         struct Node *node=head;
         while(node!=NULL){
@@ -48,6 +49,7 @@ void add_node(struct Node *node){
                 current=current->next;
         }
         current->next=node;
+        WriteDB();
 } 
 
 void create_node(struct req_buf *request){
@@ -64,17 +66,13 @@ void create_node(struct req_buf *request){
 
 
 }
-void read_from_file(){
+void ReadDB(){
         FILE *file=fopen("data.txt","r");
-        if(file==NULL){
-                printf("error in reading file\n");
-                return;
-        }
         struct employee data;
 	char line[100]; 
 
         while(fgets(line, sizeof(line), file) != NULL){
-		if (sscanf(line,"%[^,],%[^,],%d,%[^,],%f,%[^\n]", data.firstname, data.lastname, &data.emp_id, data.contact,  &data.exp, data.project) == 7) {
+		if (sscanf(line,"%[^,],%[^,],%d,%[^,],%f,%[^\n]", data.firstname, data.lastname, &data.emp_id, data.contact,  &data.exp, data.project) == 6) {
 			printf("Reading data from file: %s %s %d %s %lf %s\n", data.firstname, data.lastname, data.emp_id, data.contact, data.exp, data.project);
 
                          struct Node *node=(struct Node*)malloc(sizeof(struct Node));
@@ -96,6 +94,7 @@ void read_from_file(){
            } 
 	         else {
                          printf("Error parsing line: %s\n", line);
+                         printf("read data from file: %s %s %d %s %f %s\n", data.firstname, data.lastname, data.emp_id, data.contact, data.exp, data.project);
             }
     }
 
@@ -114,6 +113,7 @@ void traverse(){
 	
 }
 void delete_node(struct req_buf *request){
+	ReadDB();
 	if(head==NULL){
 		printf("list is empty\n");
 		return;
@@ -133,26 +133,53 @@ void delete_node(struct req_buf *request){
 		prev=current;
 		current=current->next;
 	}
+	WriteDB();
 }
+void *client_handler(void *arg) {
+	struct req_buf *req = (struct req_buf *)arg;
+	printf("Data Received is : %s \n",req->data.firstname); 
+	printf("Data operation is : %d \n",req->operation); 
+	switch(request.operation)
+	{
+	case add :
+			printf("adding node\n");
+			pthread_mutex_lock(&mutex);
+			create_node(req);
+			pthread_mutex_unlock(&mutex);
+			traverse();
+			break;
+	case delete : 
+			printf("deleting node\n");
+			pthread_mutex_lock(&mutex);
+			delete_node(req);
+			pthread_mutex_unlock(&mutex);
+			traverse();
+			break;
+	}
+	if(request.operation == add){
+			printf("adding node\n");
+			pthread_mutex_lock(&mutex);
+			create_node(req);
+			pthread_mutex_unlock(&mutex);
+			traverse();
+		}
 
+    pthread_exit(NULL);
+}
 int main() 
 { 
+	ReadDB();
 	key_t key = KEY; 
 	int msgid;  
 	msgid = msgget(key, 0666 | IPC_CREAT); 
 	while(1){
 	if(msgrcv(msgid, &request, sizeof(request), 1, 0)>0)
 	{ 
-		printf("Data Received is : %s \n",request.data.firstname); 
-		printf("Data Received is : %d \n",request.operation); 
-		if(request.operation == add){
-			printf("adding node ");
-			//addNode(request.data);
-			create_node(&request);
-			traverse();
-		}else if(request.operation == delete){
-			
-		}
+		pthread_t client_thread;
+        	if(pthread_create(&client_thread,NULL,client_handler,(void *)&request)!=0) {
+        		printf("error in pthread_create");
+            		exit(EXIT_FAILURE);
+        	}
 	}
 	}
 	// to destroy the message queue 
